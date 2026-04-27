@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Millionaire FINAL PRO</title>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+background: radial-gradient(circle,#001a4d,#000814);
+color:white;
+overflow:hidden;
+}
+
+/* START */
+#start{
+position:absolute;
+width:100%;height:100%;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+background:black;
+z-index:10;
+}
+
+.logo{
+width:160px;
+height:160px;
+border-radius:50%;
+border:4px solid gold;
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:bold;
+color:gold;
+text-align:center;
+animation:spin 10s linear infinite;
+box-shadow:0 0 20px gold;
+}
+
+@keyframes spin{
+0%{transform:rotate(0);}
+100%{transform:rotate(360deg);}
+}
+
+button{
+padding:12px 25px;
+margin-top:20px;
+border:none;
+border-radius:25px;
+background:gold;
+cursor:pointer;
+font-size:18px;
+}
+
+/* GAME */
+#game{
+display:none;
+width:100%;
+height:100vh;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+}
+
+/* LOGO TOP */
+#topLogo{
+margin-bottom:10px;
+}
+
+/* QUESTION */
+.question{
+background:linear-gradient(#0040a0,#001a4d);
+border:2px solid gold;
+border-radius:40px;
+padding:18px;
+width:70%;
+text-align:center;
+margin-bottom:30px;
+}
+
+/* ANSWERS */
+.answers{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+width:70%;
+}
+
+.answer{
+padding:15px;
+border-radius:40px;
+border:2px solid gold;
+background:linear-gradient(#0040a0,#001a4d);
+cursor:pointer;
+text-align:center;
+}
+
+.selected{background:#1e90ff;}
+.correct{background:#2ecc71 !important;}
+.wrong{background:#e74c3c !important;}
+
+#timer{
+position:absolute;
+top:20px;
+left:20px;
+color:gold;
+font-size:22px;
+}
+
+#money{
+position:absolute;
+top:20px;
+right:20px;
+background:rgba(255,255,255,0.1);
+padding:10px;
+border-radius:10px;
+}
+
+/* END */
+#end{
+display:none;
+position:absolute;
+width:100%;height:100%;
+background:black;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+font-size:40px;
+color:gold;
+text-shadow:0 0 20px gold;
+}
+</style>
+</head>
+
+<body>
+
+<!-- START -->
+<div id="start">
+<div class="logo">MILLIONAIRE</div>
+<button onclick="startGame()">▶ PLAY</button>
+</div>
+
+<!-- GAME -->
+<div id="game">
+<div id="timer">30</div>
+<div id="money"></div>
+
+<div id="topLogo" class="logo" style="width:100px;height:100px;font-size:12px;">
+MILLIONAIRE
+</div>
+
+<div id="question" class="question"></div>
+<div id="answers" class="answers"></div>
+
+<button onclick="confirm()">Confirm</button>
+<button onclick="nextQ()">Next</button>
+
+<div id="evidence"></div>
+</div>
+
+<!-- END -->
+<div id="end">
+🏆 YOU ARE A MILLIONAIRE!
+</div>
+
+<script>
+
+/* AUDIO FIX */
+let ctx;
+
+function initAudio(){
+ctx=new (window.AudioContext||window.webkitAudioContext)();
+}
+
+/* GAME SHOW STYLE SOUND */
+function tone(freq,dur){
+let o=ctx.createOscillator();
+let g=ctx.createGain();
+o.connect(g);
+g.connect(ctx.destination);
+o.frequency.value=freq;
+g.gain.value=0.2;
+o.start();
+o.stop(ctx.currentTime+dur);
+}
+
+/* CORRECT */
+function soundCorrect(){
+tone(600,0.2);
+setTimeout(()=>tone(900,0.2),150);
+}
+
+/* WRONG */
+function soundWrong(){
+tone(200,0.4);
+}
+
+/* WIN */
+function soundWin(){
+tone(500,0.2);
+setTimeout(()=>tone(700,0.2),200);
+setTimeout(()=>tone(900,0.3),400);
+}
+
+/* BG */
+function bgMusic(){
+let o=ctx.createOscillator();
+let g=ctx.createGain();
+o.connect(g);
+g.connect(ctx.destination);
+o.frequency.value=120;
+g.gain.value=0.05;
+o.start();
+}
+
+/* QUESTIONS */
+const qs=[
+{q:"Nick is very__________. He makes everyone laugh!",a:["A. confident","B. funny","C. active","D. shy"],c:1,e:"Funny = makes people laugh."},
+{q:"My sister always does her homework before class. She's very__________.",a:["A. hard-working","B. creative","C. careful","D. lazy"],c:0,e:"Hard-working = studies regularly."},
+{q:"Mi is__________. She helps me with my homework.",a:["A. hard-working","B. friendly","C. kind","D. talkative"],c:2,e:"Kind = helps others."},
+{q:"He is a__________person. He cares about everybody.",a:["A. caring","B. friendly","C. clever","D. funny"],c:0,e:"Caring = shows concern."},
+{q:"My best friend is very__________. She likes doing activities.",a:["A. creative","B. clever","C. active","D. quiet"],c:2,e:"Active = energetic."}
+];
+
+let i=0,sel=null,locked=false,time=30,timer;
+
+/* START */
+function startGame(){
+initAudio();
+bgMusic();
+
+document.getElementById("start").style.display="none";
+document.getElementById("game").style.display="flex";
+
+loadQ();
+startTimer();
+}
+
+/* LOAD */
+function loadQ(){
+sel=null;locked=false;
+document.getElementById("evidence").innerHTML="";
+document.getElementById("timer").innerText=30;
+
+let q=qs[i];
+document.getElementById("question").innerText=(i+1)+". "+q.q;
+
+let box=document.getElementById("answers");
+box.innerHTML="";
+
+q.a.forEach((t,idx)=>{
+let d=document.createElement("div");
+d.className="answer";
+d.innerText=t;
+d.onclick=()=>{if(!locked)select(idx,d)};
+box.appendChild(d);
+});
+
+moneyUI();
+}
+
+/* SELECT */
+function select(idx,el){
+document.querySelectorAll(".answer").forEach(a=>a.classList.remove("selected"));
+el.classList.add("selected");
+sel=idx;
+}
+
+/* CONFIRM */
+function confirm(){
+if(sel===null||locked)return;
+locked=true;
+
+let q=qs[i];
+let boxes=document.querySelectorAll(".answer");
+
+boxes.forEach((b,idx)=>{
+if(idx===q.c)b.classList.add("correct");
+if(idx===sel && sel!==q.c)b.classList.add("wrong");
+});
+
+if(sel===q.c)soundCorrect();
+else soundWrong();
+
+document.getElementById("evidence").innerText="Evidence: "+q.e;
+}
+
+/* NEXT */
+function nextQ(){
+if(i<qs.length-1){
+i++;
+clearInterval(timer);
+loadQ();
+startTimer();
+}else{
+endGame();
+}
+}
+
+/* TIMER */
+function startTimer(){
+time=30;
+timer=setInterval(()=>{
+time--;
+document.getElementById("timer").innerText=time;
+
+if(time<=0){
+clearInterval(timer);
+autoReveal();
+}
+},1000);
+}
+
+/* AUTO */
+function autoReveal(){
+locked=true;
+let q=qs[i];
+document.querySelectorAll(".answer").forEach((b,idx)=>{
+if(idx===q.c)b.classList.add("correct");
+});
+document.getElementById("evidence").innerText="Time's up! "+q.e;
+}
+
+/* MONEY */
+function moneyUI(){
+let money=["$100","$200","$300","$500","$1000"];
+let m=document.getElementById("money");
+m.innerHTML="";
+money.forEach((v,idx)=>{
+let d=document.createElement("div");
+d.innerText=v;
+if(idx===i)d.style.background="gold";
+m.appendChild(d);
+});
+}
+
+/* END */
+function endGame(){
+document.getElementById("game").style.display="none";
+document.getElementById("end").style.display="flex";
+soundWin();
+}
+
+</script>
+
+</body>
+</html>
